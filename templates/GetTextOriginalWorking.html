@@ -137,75 +137,33 @@
 
         let stream; // To hold the camera stream
 
-        // Function to detect if the device is likely mobile
-        // This check is generally reliable for distinguishing mobile from desktop for camera preference
-        function isMobileDevice() {
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            // Check for common mobile OS and device keywords
-            return /android|iphone|ipad|ipod|blackberry|windows phone/i.test(userAgent) ||
-                   // Also check for touch capabilities if not explicitly a desktop browser
-                   (navigator.maxTouchPoints > 0 && !/macintosh|windows|linux/i.test(userAgent));
-        }
-
         // --- Start Camera ---
         startCameraButton.addEventListener('click', async () => {
-            if (stream) { // If camera is already running, stop it first
-                stream.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-            }
-
             try {
-                // Determine facingMode based on device type
-                let videoConstraints = {};
-                if (isMobileDevice()) {
-                    // For mobile, prefer the environment (back) camera
-                    videoConstraints = { facingMode: { exact: "environment" } };
-                    warningMessage.textContent = 'Attempting to use back camera...';
-                } else {
-                    // For desktop, prefer the user (front) camera
-                    // 'user' is the default if facingMode is not specified, but good to be explicit.
-                    videoConstraints = { facingMode: "user" };
-                    warningMessage.textContent = 'Attempting to use front camera...';
-                }
-
                 // Request access to the user's camera
-                stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
                 video.style.display = 'block'; // Show the video element
                 captureButton.disabled = false; // Enable capture button
 
-                // Hide any previous results and messages
+                // Hide any previous results
                 resultContainer.style.display = 'none';
                 ocrText.textContent = '';
                 errorMessage.textContent = '';
-                warningMessage.textContent = ''; // Clear the initial warning
+                warningMessage.textContent = '';
                 capturedImagePreview.style.display = 'none';
 
                 video.onloadedmetadata = () => {
                     // Set canvas dimensions to match video stream
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    // Ensure video fills its container and maintains aspect ratio
-                    video.style.objectFit = 'cover'; // Add this for better video fit
                 };
 
             } catch (err) {
                 console.error('Error accessing camera:', err);
-                // More specific error messages for better user experience
-                if (err.name === 'NotFoundError' || err.name === 'NotReadableError' || err.name === 'OverconstrainedError') {
-                    errorMessage.textContent = 'Error: No suitable camera found or specific camera could not be used (e.g., back camera not available). It might be in use by another app or your device lacks the requested camera type.';
-                } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    errorMessage.textContent = 'Error: Camera access denied. Please grant permission in your browser settings.';
-                } else if (err.name === 'AbortError') {
-                    errorMessage.textContent = 'Error: Camera access was aborted.';
-                } else if (err.name === 'SecurityError') {
-                     errorMessage.textContent = 'Error: Camera access denied due to security reasons (e.g., not on HTTPS).';
-                }
-                else {
-                    errorMessage.textContent = 'An unexpected error occurred: ' + err.message;
-                }
-                resultContainer.style.display = 'block'; // Show result container to display error
-                captureButton.disabled = true; // Disable capture button on error
+                alert('Could not access camera. Please ensure you have a webcam and granted permission.');
+                errorMessage.textContent = 'Error accessing camera: ' + err.message;
+                resultContainer.style.display = 'block';
             }
         });
 
@@ -279,7 +237,7 @@
             }
 
             // Option 1: Navigate to a blank page (most reliable way to "clear" the screen)
-            window.location.href = 'about:blank'; // or 'data:text/html,<p>Exited</p>' for a simple message
+            // window.location.href = 'about:blank'; // or 'data:text/html,<p>Exited</p>' for a simple message
 
             // Option 2: Go back in browser history (if there's a page to go back to)
             // window.history.back();
@@ -289,13 +247,6 @@
 
             // Option 4 (Less reliable for security reasons, only works if this window was opened by script):
             //window.close();
-        });
-
-        // Add a listener for when the page closes or navigates away
-        window.addEventListener('beforeunload', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
         });
     </script>
 </body>
