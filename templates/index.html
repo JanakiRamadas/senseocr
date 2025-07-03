@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sense Text in Photo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        #videoContainer {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        #videoElement {
+            width: 100%;
+            max-width: 480px; /* Adjust as needed */
+            height: auto;
+            border: 1px solid #ddd;
+            background-color: #000;
+            display: none; /* Hidden until camera starts */
+        }
+        canvas {
+            display: none; /* Canvas is hidden, used for processing */
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result-container {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            text-align: left;
+        }
+        .result-container h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        #ocrText {
+            white-space: pre-wrap; /* Preserves whitespace and line breaks */
+            word-wrap: break-word;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+        }
+        .warning-message {
+            color: orange;
+            font-weight: bold;
+        }
+        #capturedImagePreview {
+            margin-top: 15px;
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <img src="{{ url_for('static', filename='images/dowell_Logo.jpg') }}" alt="Dowell logo" class="logo">
+        <h2>Capture Photo and Sense Text in it</h2>
+        <h4 style = "color: red;">Note: This is only a Proof of Concept, NOT a full fledged application</h4>
+        
+            <div id="videoContainer">
+                <video id="videoElement" autoplay></video>
+                <canvas id="canvasElement"></canvas>
+                <img id="capturedImagePreview" alt="Captured Image">
+                <div>
+                    <button id="startCameraButton">Start Camera</button>
+                    <button id="captureButton" disabled>Capture Photo</button>
+                </div>
+            </div>
+
+            <div class="result-container" id="resultContainer" style="display: none;">
+                <h2>OCR Result:</h2>
+                <pre id="ocrText"></pre>
+                <p id="errorMessage" class="error-message"></p>
+                <p id="warningMessage" class="warning-message"></p>
+            </div>
+        
+    </div>
+
+    <script>
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('canvasElement');
+        const context = canvas.getContext('2d');
+        const startCameraButton = document.getElementById('startCameraButton');
+        const captureButton = document.getElementById('captureButton');
+        const capturedImagePreview = document.getElementById('capturedImagePreview');
+
+        const resultContainer = document.getElementById('resultContainer');
+        const ocrText = document.getElementById('ocrText');
+        const errorMessage = document.getElementById('errorMessage');
+        const warningMessage = document.getElementById('warningMessage');
+
+        let stream; // To hold the camera stream
+
+        // --- Start Camera ---
+        startCameraButton.addEventListener('click', async () => {
+            try {
+                // Request access to the user's camera
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.style.display = 'block'; // Show the video element
+                captureButton.disabled = false; // Enable capture button
+
+                // Hide any previous results
+                resultContainer.style.display = 'none';
+                ocrText.textContent = '';
+                errorMessage.textContent = '';
+                warningMessage.textContent = '';
+                capturedImagePreview.style.display = 'none';
+
+                video.onloadedmetadata = () => {
+                    // Set canvas dimensions to match video stream
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                alert('Could not access camera. Please ensure you have a webcam and granted permission.');
+                errorMessage.textContent = 'Error accessing camera: ' + err.message;
+                resultContainer.style.display = 'block';
+            }
+        });
+
+        // --- Capture Photo and Send for OCR ---
+        captureButton.addEventListener('click', async () => {
+            if (!stream) {
+                alert('Please start the camera first!');
+                return;
+            }
+
+            // Draw the current video frame onto the canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Display preview of captured image
+            capturedImagePreview.src = canvas.toDataURL('image/png');
+            capturedImagePreview.style.display = 'block';
+
+            // Convert canvas content to a Blob (more efficient for sending)
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    errorMessage.textContent = 'Failed to capture image.';
+                    resultContainer.style.display = 'block';
+                    return;
+                }
+
+                const formData = new FormData();
+                // Append the blob as 'file' with the desired default filename 'default.png'
+                formData.append('file', blob, 'default.png');
+
+                // Clear previous results/errors
+                ocrText.textContent = '';
+                errorMessage.textContent = '';
+                warningMessage.textContent = '';
+                resultContainer.style.display = 'block'; // Show result area immediately for loading message
+
+                try {
+                    // You could add a loading indicator here
+                    ocrText.textContent = 'Processing... Please wait.';
+
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        ocrText.textContent = data.text;
+                        if (data.warning) {
+                            warningMessage.textContent = 'Warning: ' + data.warning;
+                        }
+                    } else {
+                        ocrText.textContent = ''; // Clear processing message
+                        errorMessage.textContent = 'Error: ' + data.error;
+                    }
+
+                } catch (error) {
+                    ocrText.textContent = ''; // Clear processing message
+                    errorMessage.textContent = 'An unexpected error occurred: ' + error.message;
+                }
+            }, 'image/png'); // Specify the image format
+        });
+    </script>
+</body>
+</html>

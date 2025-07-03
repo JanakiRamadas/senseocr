@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Image Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        input[type="file"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+        .result-container {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .result-container h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+        }
+        .warning-message {
+            color: orange;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Image for OCR</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label for="fileInput">Choose PNG/JPG/GIF Image:</label>
+            <input type="file" id="fileInput" name="file" accept=".png,.jpg,.jpeg,.gif">
+            <input type="submit" value="Perform OCR">
+        </form>
+
+        <div class="result-container" id="resultContainer" style="display: none;">
+            <h2>OCR Result:</h2>
+            <pre id="ocrText"></pre>
+            <p id="errorMessage" class="error-message"></p>
+            <p id="warningMessage" class="warning-message"></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const resultContainer = document.getElementById('resultContainer');
+            const ocrText = document.getElementById('ocrText');
+            const errorMessage = document.getElementById('errorMessage');
+            const warningMessage = document.getElementById('warningMessage');
+
+            ocrText.textContent = '';
+            errorMessage.textContent = '';
+            warningMessage.textContent = '';
+            resultContainer.style.display = 'none';
+
+            if (!file) {
+                errorMessage.textContent = 'Please select a file to upload.';
+                resultContainer.style.display = 'block';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    ocrText.textContent = data.text;
+                    if (data.warning) {
+                        warningMessage.textContent = 'Warning: ' + data.warning;
+                    }
+                } else {
+                    errorMessage.textContent = 'Error: ' + data.error;
+                }
+                resultContainer.style.display = 'block';
+
+            } catch (error) {
+                errorMessage.textContent = 'An unexpected error occurred: ' + error.message;
+                resultContainer.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
